@@ -3,6 +3,8 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 import cv2
 import numpy as np
+from scipy.signal import convolve2d
+import matplotlib.pyplot as plt
 
 
 class ImageProcessingApp:
@@ -83,6 +85,111 @@ class ImageProcessingApp:
         self.median5_button = tk.Button(self.smoothing_frame, text="Медианный фильтр (5x5)",
                                         command=lambda: self.apply_filter(5, 'median'))
         self.median5_button.grid(row=0, column=3, padx=5)
+
+        self.gaus_button = tk.Button(self.smoothing_frame, text='Гаусовское сглаживание',
+                                     command=lambda: self.display_blur_images('gaus'))
+        self.gaus_button.grid(row=1, column=0)
+
+        self.sigma_button = tk.Button(self.smoothing_frame, text='Сигма фильтр',
+                                      command=lambda: self.display_blur_images('sigma'))
+        self.sigma_button.grid(row=1, column=1)
+
+    def sigma_filter(self, sigma=1):
+        """Применение сигма-фильтра к изображению"""
+        image = Image.open(self.image_path)
+        image_array = np.array(image)
+
+        # Применение фильтра к каждому пикселю
+        filtered_image_array = np.zeros_like(image_array, dtype=np.float32)
+        height, width, channels = image_array.shape
+
+        for y in range(height):
+            for x in range(width):
+                for c in range(channels):
+                    # Определение границ окна для текущего пикселя
+                    y_min = max(0, y - sigma)
+                    y_max = min(height - 1, y + sigma)
+                    x_min = max(0, x - sigma)
+                    x_max = min(width - 1, x + sigma)
+
+                    # Вычисление среднего значения в окне
+                    window = image_array[y_min:y_max + 1, x_min:x_max + 1, c]
+                    average_value = np.mean(window)
+
+                    # Замена пикселя средним значением окна
+                    filtered_image_array[y, x, c] = average_value
+
+        # Преобразование массива обратно в изображение
+        filtered_image = Image.fromarray(np.uint8(filtered_image_array))
+        return filtered_image
+
+    def gaussian_blur(self, sigma=5.0):
+        """Применение гауссовского сглаживания к изображению"""
+        image = Image.open(self.image_path)
+        image_array = np.array(image)
+
+        # Создание ядра Гаусса
+        kernel_size = int(6 * sigma + 1)  # Размер ядра рассчитывается на основе sigma
+        kernel = self.gaussian_kernel(kernel_size, sigma)
+
+        # Применение свертки с ядром Гаусса
+        blurred_image_array = self.apply_convolution(image_array, kernel)
+
+        # Преобразование массива обратно в изображение
+        blurred_image = Image.fromarray(np.uint8(blurred_image_array))
+
+        return blurred_image
+
+    def apply_convolution(self, image_array, kernel):
+        """Применение свертки к изображению с использованием заданного ядра"""
+        output = np.zeros_like(image_array)
+        for c in range(image_array.shape[2]):  # Проходим по каждому каналу цвета
+            output[:, :, c] = convolve2d(image_array[:, :, c], kernel, mode='same', boundary='symm')
+        return output
+
+    def gaussian_kernel(self, size, sigma=1.0):
+        """Функция для создания ядра Гаусса"""
+        x, y = np.meshgrid(np.arange(-size // 2 + 1, size // 2 + 1),
+                           np.arange(-size // 2 + 1, size // 2 + 1))
+        kernel = np.exp(-(x ** 2 + y ** 2) / (2. * sigma ** 2))
+        return kernel / np.sum(kernel)
+
+    def display_blur_images(self, mode):
+        """Отображение изображений сглаженной версии с разными значениями сигмы"""
+        sigmas = [1, 3, 10]
+
+        # Создание нового окна графика
+        fig, axs = plt.subplots(2, len(sigmas), figsize=(15, 10))
+
+        for i, sigma in enumerate(sigmas):
+            # Применение гауссовского сглаживания или сигма-фильтра
+            if mode == 'gaus':
+                original_image = Image.open(self.image_path)
+                blurred_image = self.gaussian_blur(sigma)
+            elif mode == 'sigma':
+                original_image = Image.open(self.image_path)
+                blurred_image = self.sigma_filter(sigma)
+
+            # Отображение сглаженного изображения в подграфике
+            axs[0, i].imshow(original_image)
+            axs[0, i].set_title(f"Original (Sigma = {sigma})")
+            axs[0, i].axis('off')
+
+            axs[1, i].imshow(blurred_image)
+            axs[1, i].set_title(f"Blurred (Sigma = {sigma})")
+            axs[1, i].axis('off')
+
+            # Вычисление абсолютной разности между исходным и сглаженным изображениями
+            diff_array = np.abs(np.array(original_image) - np.array(blurred_image))
+
+            # Отображение карты разности под каждым сглаженным изображением
+            axs[1, i].imshow(diff_array)
+            axs[1, i].set_title(f"Difference (Sigma = {sigma})")
+            axs[1, i].axis('off')
+
+        # Отображение окна графика с изображениями и картами разности
+        plt.tight_layout()
+        plt.show()
 
     def open_image(self):
         self.image_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
