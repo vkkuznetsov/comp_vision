@@ -86,8 +86,35 @@ class ImageProcessingApp:
         image_array = np.array(self.image.convert('L'))
 
         # Определяем ядра фильтра Собеля для горизонтального и вертикального градиента
-        sobel_kernel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
-        sobel_kernel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+        if size == 3:
+            sobel_kernel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+            sobel_kernel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+        elif size == 5:
+            sobel_kernel_x = np.array([[-2, -1, 0, 1, 2],
+                                       [-2, -1, 0, 1, 2],
+                                       [-2, -1, 0, 1, 2],
+                                       [-2, -1, 0, 1, 2],
+                                       [-2, -1, 0, 1, 2]])
+            sobel_kernel_y = np.array([[-2, -2, -2, -2, -2],
+                                       [-1, -1, -1, -1, -1],
+                                       [0, 0, 0, 0, 0],
+                                       [1, 1, 1, 1, 1],
+                                       [2, 2, 2, 2, 2]])
+        elif size == 7:
+            sobel_kernel_x = np.array([[-3, -2, -1, 0, 1, 2, 3],
+                                       [-3, -2, -1, 0, 1, 2, 3],
+                                       [-3, -2, -1, 0, 1, 2, 3],
+                                       [-3, -2, -1, 0, 1, 2, 3],
+                                       [-3, -2, -1, 0, 1, 2, 3],
+                                       [-3, -2, -1, 0, 1, 2, 3],
+                                       [-3, -2, -1, 0, 1, 2, 3]])
+            sobel_kernel_y = np.array([[-3, -3, -3, -3, -3, -3, -3],
+                                       [-2, -2, -2, -2, -2, -2, -2],
+                                       [-1, -1, -1, -1, -1, -1, -1],
+                                       [0, 0, 0, 0, 0, 0, 0],
+                                       [1, 1, 1, 1, 1, 1, 1],
+                                       [2, 2, 2, 2, 2, 2, 2],
+                                       [3, 3, 3, 3, 3, 3, 3]])
 
         # Получаем размеры изображения
         height, width = image_array.shape
@@ -96,11 +123,13 @@ class ImageProcessingApp:
         sobel_image = np.zeros((height, width))
 
         # Применяем фильтр Собеля, игнорируя крайние пиксели
-        for y in range(1, height - 1):
-            for x in range(1, width - 1):
+        for y in range(size // 2, height - size // 2):
+            for x in range(size // 2, width - size // 2):
                 # Вычисляем горизонтальный и вертикальный градиенты
-                gx = np.sum(np.multiply(sobel_kernel_x, image_array[y - 1:y + 2, x - 1:x + 2]))
-                gy = np.sum(np.multiply(sobel_kernel_y, image_array[y - 1:y + 2, x - 1:x + 2]))
+                gx = np.sum(np.multiply(sobel_kernel_x,
+                                        image_array[y - size // 2:y + size // 2 + 1, x - size // 2:x + size // 2 + 1]))
+                gy = np.sum(np.multiply(sobel_kernel_y,
+                                        image_array[y - size // 2:y + size // 2 + 1, x - size // 2:x + size // 2 + 1]))
 
                 # Вычисляем магнитуду градиента
                 sobel_image[y, x] = np.sqrt(gx ** 2 + gy ** 2)
