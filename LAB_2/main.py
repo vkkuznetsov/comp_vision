@@ -252,6 +252,7 @@ class ImageProcessingApp:
 
         return Image.fromarray(filtered_image)
 
+    # п.1
     def logarithmic_transform(self):
         if self.image_path:
             image = Image.open(self.image_path)
@@ -292,7 +293,9 @@ class ImageProcessingApp:
             image = Image.open(self.image_path)
             image_array = np.array(image)
             clipped_image = np.clip(image_array, min_val, max_val)
-            clipped_image[np.where((image_array < min_val) | (image_array > max_val))] = constant_value
+            clipped_image[np.where((image_array >= min_val) & (image_array <= max_val))] = 0
+            clipped_image[np.where(image_array < min_val)] = constant_value
+            clipped_image[np.where(image_array > max_val)] = constant_value
             clipped_image = np.uint8(clipped_image)
             clipped_image = Image.fromarray(clipped_image)
             self.display_transformed_image(clipped_image)
@@ -304,10 +307,11 @@ class ImageProcessingApp:
             image = Image.open(self.image_path)
             image_array = np.array(image)
             clipped_image = np.clip(image_array, min_val, max_val)
+            clipped_image[np.where((image_array >= min_val) & (image_array <= max_val))] = 0
             clipped_image = Image.fromarray(np.uint8(clipped_image))
             self.display_transformed_image(clipped_image)
 
-#п3.1
+    # п3.1
     def apply_unsharp_mask(self):
         kernel_size = int(self.kernel_size_entry.get() or 5)
         amount = float(self.amount_entry.get() or 1.5)
@@ -318,7 +322,6 @@ class ImageProcessingApp:
             sharpened_image = image_array + amount * (image_array - blurred_image)
             sharpened_image = np.clip(sharpened_image, 0, 255).astype(np.uint8)
             self.display_transformed_image(Image.fromarray(sharpened_image))
-
 
     def compare_sharpness_transformations(self):
         if not self.image_path:
@@ -359,11 +362,8 @@ class ImageProcessingApp:
         return sharpened_image
 
     def assess_sharpness(self, image_array):
-        # Вычисление разности между соседними пикселями в горизонтальном и вертикальном направлениях
         diff_x = np.abs(np.diff(image_array, axis=1))
         diff_y = np.abs(np.diff(image_array, axis=0))
-
-        # Среднее абсолютных разностей как мера резкости
         sharpness = (np.mean(diff_x) + np.mean(diff_y)) / 2
         return sharpness
 
@@ -385,8 +385,8 @@ class ImageProcessingApp:
 
     def power_transform_return(self):
         if self.image_path:
-            gamma = 1.5  # Произвольное значение гаммы
-            c = 1  # Произвольное значение коэффициента
+            gamma = 1.5
+            c = 1
             image = Image.open(self.image_path)
             image_array = np.array(image)
             power_transformed = c * np.power(image_array, gamma)
@@ -395,7 +395,7 @@ class ImageProcessingApp:
 
     def binary_transform_return(self):
         if self.image_path:
-            threshold = 128  # Произвольное пороговое значение
+            threshold = 128
             image = Image.open(self.image_path)
             image_array = np.array(image)
             binary_transformed = np.where(image_array < threshold, 0, 255)
