@@ -33,38 +33,53 @@ class ImageProcessingApp:
 
     def create_image_loading_interface(self):
         self.load_image_button = tk.Button(self.root, text="Загрузить изображение", command=self.open_image)
-        self.load_image_button.pack(pady=10)
+        self.load_image_button.grid(row=0, column=0, pady=10)
 
     def create_image_display_interface(self):
         self.canvas = tk.Canvas(self.root, width=600, height=600)
-        self.canvas.pack()
+        self.canvas.grid(row=1, column=0, columnspan=3)
 
     def create_threshold_interface(self):
         self.threshold_frame = tk.LabelFrame(self.root, text="Выбор порога")
-        self.threshold_frame.pack(pady=10)
+        self.threshold_frame.grid(row=2, column=0, padx=10, pady=10)
 
-        self.edging = tk.Button(self.threshold_frame, text="Выделение краев", command=self.apply_segmentation)
-        self.edging.pack()
+        self.edging = tk.Button(self.threshold_frame, text="Последовательное приближение", command=self.apply_segmentation)
+        self.edging.grid(row=0, column=0, columnspan=2, pady=5)
 
         self.method_var = tk.StringVar()
         self.method_var.set("P-tile")
 
         methods = ["P-tile", "Mean", "Median"]
-        for method in methods:
-            tk.Radiobutton(self.threshold_frame, text=method, variable=self.method_var, value=method).pack(anchor=tk.W)
+        for i, method in enumerate(methods):
+            tk.Radiobutton(self.threshold_frame, text=method, variable=self.method_var, value=method).grid(row=i + 1,
+                                                                                                           column=0,
+                                                                                                           sticky="w",
+                                                                                                           padx=5)
 
         self.threshold_scale = tk.Scale(self.threshold_frame, from_=0, to=255, orient=tk.HORIZONTAL, label="Порог")
-        self.threshold_scale.pack()
+        self.threshold_scale.grid(row=len(methods) + 1, column=0, columnspan=2, pady=5)
 
         self.threshold_button = tk.Button(self.threshold_frame, text="Применить порог", command=self.apply_threshold)
-        self.threshold_button.pack()
+        self.threshold_button.grid(row=len(methods) + 2, column=0, columnspan=2, pady=5)
 
-        self.approximation = tk.Button(self.threshold_frame, text="Последовательное приближение", command=self.apply_segmentation)
-        self.approximation.pack()
+    def create_threshold_interface2(self):
+        self.threshold_frame2 = tk.LabelFrame(self.root, text="Выбор порога")
+        self.threshold_frame2.grid(row=2, column=1, padx=10, pady=10)
 
-        self.kmeans = tk.Button(self.threshold_frame, text="K-Средних",
-                                       command=self.apply_k_means())
-        self.kmeans.pack()
+        self.threshold_scale2 = tk.Scale(self.threshold_frame2, from_=0, to=100, orient=tk.HORIZONTAL,
+                                         label="Процентиль")
+        self.threshold_scale2.set(95)
+        self.threshold_scale2.pack()
+
+        self.segment_button = tk.Button(self.threshold_frame2, text="Применить сегментацию",
+                                        command=self.apply_segmentation2)
+        self.segment_button.pack()
+
+    def create_threshold_interface3(self):
+        self.threshold_frame3 = tk.LabelFrame(self.root, text="Выбор порога")
+        self.threshold_frame3.grid(row=2, column=2, padx=10, pady=10)
+
+        # Add your elements for the third interface here
 
     def apply_segmentation(self):
         if self.image is not None:
@@ -135,17 +150,6 @@ class ImageProcessingApp:
             segmented_image = Image.fromarray(binary_image)
             self.display_image(segmented_image)
 
-    def create_threshold_interface2(self):
-        self.threshold_frame = tk.LabelFrame(self.root, text="Выбор порога")
-        self.threshold_frame.pack(pady=10)
-
-        self.threshold_scale = tk.Scale(self.threshold_frame, from_=0, to=100, orient=tk.HORIZONTAL, label="Процентиль")
-        self.threshold_scale.set(95)
-        self.threshold_scale.pack()
-
-        self.segment_button = tk.Button(self.root, text="Применить сегментацию", command=self.apply_segmentation2)
-        self.segment_button.pack()
-
     def open_image(self):
         self.image_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
         if self.image_path:
@@ -196,13 +200,30 @@ class ImageProcessingApp:
             # Displaying the segmented image
             segmented_image = Image.fromarray(binary_image)
             self.display_image(segmented_image)
+#пункт 1
+    def segment_by_edge_detection(self):
+        # Преобразование изображения в оттенки серого
+        grayscale_image = cv2.cvtColor(self.image, cv2.COLOR_RGB2GRAY)
+
+        # Применение алгоритма выделения краев
+        edges = cv2.Canny(grayscale_image, 100, 200)  # Пример использования оператора Кэнни
+
+        # Бинаризация краевого изображения
+        binary_image = np.where(edges > 0, 255, 0).astype(np.uint8)
+
+        # Преобразование в объект Image для отображения
+        segmented_image = Image.fromarray(binary_image)
+
+        return segmented_image
+
+#пункт P-tile
     def apply_segmentation2(self):
         if self.image is not None:
             # Преобразование изображения в оттенки серого
             grayscale_image = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2GRAY)
 
             # Вычисление порога на основе процентиля (P-tile)
-            percentile = self.threshold_scale.get()
+            percentile = self.threshold_scale2.get()
             threshold = np.percentile(grayscale_image, percentile)
 
             # Бинаризация изображения по порогу
@@ -211,6 +232,7 @@ class ImageProcessingApp:
             # Отображение сегментированного изображения
             segmented_image = Image.fromarray(binary_image)
             self.display_image(segmented_image)
+
 
 def calculate_histogram(image):
     histogram, _ = np.histogram(image.flatten(), bins=256, range=(0, 256))
