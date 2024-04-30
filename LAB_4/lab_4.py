@@ -43,7 +43,8 @@ class ImageProcessingApp:
         self.threshold_frame = tk.LabelFrame(self.root, text="Выбор порога")
         self.threshold_frame.grid(row=2, column=0, padx=10, pady=10)
 
-        self.edging = tk.Button(self.threshold_frame, text="Последовательное приближение", command=self.apply_segmentation)
+        self.edging = tk.Button(self.threshold_frame, text="Последовательное приближение",
+                                command=self.apply_segmentation)
         self.edging.grid(row=0, column=0, columnspan=2, pady=5)
 
         self.method_var = tk.StringVar()
@@ -78,8 +79,6 @@ class ImageProcessingApp:
     def create_threshold_interface3(self):
         self.threshold_frame3 = tk.LabelFrame(self.root, text="Выбор порога")
         self.threshold_frame3.grid(row=2, column=2, padx=10, pady=10)
-
-        # Add your elements for the third interface here
 
     def apply_segmentation(self):
         if self.image is not None:
@@ -173,7 +172,7 @@ class ImageProcessingApp:
             grayscale_array = np.array(grayscale_image)
 
             if method == "P-tile":
-                histogram = calculate_histogram(grayscale_array)
+                histogram = calculate_and_plot_histogram(grayscale_array)
                 threshold = ptile_threshold(histogram, threshold)
             elif method == "Mean":
                 threshold = np.mean(grayscale_array)
@@ -200,7 +199,8 @@ class ImageProcessingApp:
             # Displaying the segmented image
             segmented_image = Image.fromarray(binary_image)
             self.display_image(segmented_image)
-#пункт 1
+
+    # пункт 1
     def segment_by_edge_detection(self):
         # Преобразование изображения в оттенки серого
         grayscale_image = cv2.cvtColor(self.image, cv2.COLOR_RGB2GRAY)
@@ -216,7 +216,7 @@ class ImageProcessingApp:
 
         return segmented_image
 
-#пункт P-tile
+    # пункт P-tile
     def apply_segmentation2(self):
         if self.image is not None:
             # Преобразование изображения в оттенки серого
@@ -234,8 +234,19 @@ class ImageProcessingApp:
             self.display_image(segmented_image)
 
 
-def calculate_histogram(image):
-    histogram, _ = np.histogram(image.flatten(), bins=256, range=(0, 256))
+import matplotlib.pyplot as plt
+
+
+def calculate_and_plot_histogram(image):
+    # Построение гистограммы
+    compare_smoothing(image)
+    plt.figure()
+    histogram, bin_edges, _ = plt.hist(image.flatten(), bins=256, range=(0, 256), color='gray', edgecolor="black")
+    plt.title('Histogram')
+    plt.xlabel('Pixel Intensity')
+    plt.ylabel('Frequency')
+    plt.show()
+
     return histogram
 
 
@@ -255,6 +266,31 @@ def ptile_threshold(histogram, percentile):
 def binarize_image(image, threshold):
     binarized_image = np.where(image >= threshold, 255, 0)
     return binarized_image.astype(np.uint8)
+
+
+import scipy.signal
+
+
+def compare_smoothing(image, smooth_levels=[1, 3, 5,10,15]):
+    histogram, _ = np.histogram(image.flatten(), bins=256, range=(0, 256))
+
+    for level in smooth_levels:
+        smoothed_hist = smooth_histogram(histogram, iterations=level)
+        peaks, _ = scipy.signal.find_peaks(smoothed_hist)
+
+        plt.figure()
+        plt.plot(smoothed_hist)
+        plt.plot(peaks, smoothed_hist[peaks], "x")
+        plt.title(f'Smoothed Histogram with {level} iterations')
+        plt.xlabel('Pixel Intensity')
+        plt.ylabel('Frequency')
+        plt.show()
+
+
+def smooth_histogram(histogram, iterations=3):
+    for _ in range(iterations):
+        histogram = np.convolve(histogram, [1 / 3, 1 / 3, 1 / 3], mode='same')
+    return histogram
 
 
 if __name__ == "__main__":
