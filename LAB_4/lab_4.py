@@ -6,6 +6,7 @@ from PIL import Image, ImageTk
 import numpy as np
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
+import scipy.signal
 
 
 class ImageProcessingApp:
@@ -68,11 +69,12 @@ class ImageProcessingApp:
         self.kmeans = tk.Button(self.threshold_frame2, text="К-means", command=self.k_means_segmentation)
         self.kmeans.pack(pady=5)
 
+        self.hists = tk.Button(self.threshold_frame2, text='Гистрограмма', command=self.create_hists)
+        self.hists.pack(pady=5)
+
     def create_threshold_interface3(self):
         self.threshold_frame = tk.LabelFrame(self.root, text="ПУНКТ 3")
         self.threshold_frame.grid(row=2, column=2, padx=10, pady=10)
-
-
 
         self.method_var = tk.StringVar()
         self.method_var.set("P-tile")
@@ -118,7 +120,7 @@ class ImageProcessingApp:
         segmented_image = Image.fromarray(binary_image)
         self.display_image(segmented_image)
 
-    # пункт P-tile
+    # пункт 2  P-tile
     def p_tile_segmentation(self):
         if self.image is not None:
             # Преобразование изображения в оттенки серого
@@ -205,25 +207,38 @@ class ImageProcessingApp:
             plt.tight_layout()
             plt.show()
 
+    def create_hists(self):
+        if self.image is not None:
+            pass
+
+    # Пункт 3 адаптивный порог
     def apply_threshold(self):
         if self.image is not None:
+            grayscale_image = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2GRAY)
+
+            # Получение выбранного метода
             method = self.method_var.get()
-            threshold = self.threshold_scale.get()
 
-            grayscale_image = self.image.convert("L")
-            grayscale_array = np.array(grayscale_image)
+            # Получение выбранного значения порога
+            threshold_value = self.threshold_scale.get()
 
-            if method == "P-tile":
-                histogram = calculate_and_plot_histogram(grayscale_array)
-                threshold = ptile_threshold(histogram, threshold)
-            elif method == "Mean":
-                threshold = np.mean(grayscale_array)
-            elif method == "Median":
-                threshold = np.median(grayscale_array)
+            # Применение выбранного метода порогования
+            if method == "Среднее":
+                thresholded_image = cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                                                          cv2.THRESH_BINARY, 11, threshold_value)
+            elif method == "Медиана":
+                thresholded_image = cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                                          cv2.THRESH_BINARY, 11, threshold_value)
+            elif method == "(min+max)/2":
+                thresholded_image = cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                                                          cv2.THRESH_BINARY, 11, threshold_value)
+                thresholded_image += cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                                           cv2.THRESH_BINARY_INV, 11, threshold_value)
+                thresholded_image //= 2  # Применение формулы (min+max)/2
 
-            binarized_image = binarize_image(grayscale_array, threshold)
-            binarized_image = Image.fromarray(binarized_image)
-            self.display_image(binarized_image)
+            # Отображение сегментированного изображения
+            segmented_image = Image.fromarray(thresholded_image)
+            self.display_image(segmented_image)
 
 
 def calculate_and_plot_histogram(image):
@@ -237,27 +252,6 @@ def calculate_and_plot_histogram(image):
     plt.show()
 
     return histogram
-
-
-def ptile_threshold(histogram, percentile):
-    total_pixels = np.sum(histogram)
-    target_pixels = total_pixels * (percentile / 100)
-    cumulative_sum = 0
-    threshold = 0
-    for i in range(len(histogram)):
-        cumulative_sum += histogram[i]
-        if cumulative_sum >= target_pixels:
-            threshold = i
-            break
-    return threshold
-
-
-def binarize_image(image, threshold):
-    binarized_image = np.where(image >= threshold, 255, 0)
-    return binarized_image.astype(np.uint8)
-
-
-import scipy.signal
 
 
 def compare_smoothing(image, smooth_levels=[1, 3, 5, 10, 15]):
