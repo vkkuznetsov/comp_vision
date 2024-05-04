@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import filedialog
-import copy
 import cv2
 from PIL import Image, ImageTk
 import numpy as np
@@ -39,7 +38,7 @@ class ImageProcessingApp:
         self.load_image_button.grid(row=0, column=1, pady=10)
 
     def create_image_display_interface(self):
-        self.canvas = tk.Canvas(self.root, width=600, height=600)
+        self.canvas = tk.Canvas(self.root, width=500, height=500)
         self.canvas.grid(row=1, column=0, columnspan=3)
 
     def create_threshold_interface1(self):
@@ -49,6 +48,7 @@ class ImageProcessingApp:
         self.nearing = tk.Button(self.threshold_frame3, text="Алгоритм выделения краев",
                                  command=self.segment_by_edge_detection)
         self.nearing.pack()
+
 
     def create_threshold_interface2(self):
         self.threshold_frame2 = tk.LabelFrame(self.root, text="ПУНКТ 2.")
@@ -85,7 +85,8 @@ class ImageProcessingApp:
 
         self.threshold_scale = tk.Scale(self.threshold_frame, from_=0, to=255, orient=tk.HORIZONTAL, label="Порог")
         self.threshold_scale.grid(row=len(methods) + 1, column=2, columnspan=2, pady=5)
-        self.threshold_scale_k = tk.Scale(self.threshold_frame, from_=3, to=51, orient=tk.HORIZONTAL, label="Размер k", resolution=2)
+        self.threshold_scale_k = tk.Scale(self.threshold_frame, from_=3, to=51, orient=tk.HORIZONTAL, label="Размер k",
+                                          resolution=2)
         self.threshold_scale_k.grid(row=len(methods) + 2, column=2, columnspan=2, pady=5)
 
         self.threshold_button = tk.Button(self.threshold_frame, text="Адаптивный порог",
@@ -108,14 +109,11 @@ class ImageProcessingApp:
 
     # пункт 1
     def segment_by_edge_detection(self):
-        # Преобразование изображения в оттенки серого
         grayscale_image = np.array(self.image.convert("L"))
 
-        # Применение алгоритма выделения краев
-        edges = cv2.Canny(grayscale_image, 100, 200)  # Пример использования оператора Кэнни
-
-        # Бинаризация краевого изображения
-        binary_image = np.where(edges > 0, 255, 0).astype(np.uint8)
+        edges = cv2.Canny(grayscale_image, 100, 200)
+#убрать хардкод
+        binary_image = np.where(edges > 0, 0, 255).astype(np.uint8)
 
         segmented_image = Image.fromarray(binary_image)
         self.display_image(segmented_image)
@@ -123,17 +121,13 @@ class ImageProcessingApp:
     # пункт 2  P-tile
     def p_tile_segmentation(self):
         if self.image is not None:
-            # Преобразование изображения в оттенки серого
             grayscale_image = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2GRAY)
 
-            # Вычисление порога на основе процентиля (P-tile)
             percentile = self.threshold_scale2.get()
             threshold = np.percentile(grayscale_image, percentile)
 
-            # Бинаризация изображения по порогу
             binary_image = np.where(grayscale_image >= threshold, 255, 0).astype(np.uint8)
 
-            # Отображение сегментированного изображения
             segmented_image = Image.fromarray(binary_image)
             self.display_image(segmented_image)
 
@@ -145,41 +139,34 @@ class ImageProcessingApp:
             percentile = self.threshold_scale2.get()
             threshold = np.percentile(grayscale_image, percentile)
 
-            # Максимальное количество итераций
             max_iterations = 100
             iteration = 0
-            smooth_levels = [0, 1, 3, 5]
+            smooth_levels = [0, 1, 3, 50]
             fig, axes = plt.subplots(len(smooth_levels), 2, figsize=(10, 15))
             for i, smooth in enumerate(smooth_levels):
                 smoothed_image = self.smooth_image(grayscale_image, smooth)
                 while True:
-                    # Разделение пикселей на два класса (фон и объекты) по текущему порогу
                     foreground_pixels = smoothed_image[smoothed_image > threshold]
                     background_pixels = smoothed_image[smoothed_image <= threshold]
 
-                    # Пересчет средних значений яркости для двух классов
                     foreground_mean = np.mean(foreground_pixels)
                     background_mean = np.mean(background_pixels)
 
-                    # Обновление порога
                     new_threshold = (foreground_mean + background_mean) / 2
 
-                    # Проверка на сходимость
-                    if abs(new_threshold - threshold) < 1 or iteration >= max_iterations:
+                    if abs(new_threshold - threshold) < 0.1 or iteration >= max_iterations:
                         break
 
                     threshold = new_threshold
                     iteration += 1
 
-                # Бинаризация изображения по полученному порогу
                 binary_image = np.where(grayscale_image > threshold, 255, 0).astype(np.uint8)
 
-                # Отображение сегментированного изображения
                 segmented_image = Image.fromarray(binary_image)
                 axes[i, 0].imshow(segmented_image, cmap='gray')
-                axes[i, 0].set_title(f'Сглаживание = {smooth})')
+                axes[i, 0].set_title(f'Сглаживание = {smooth}')
                 axes[i, 0].axis('off')
-                self.compare_smoothing(grayscale_image, axes[i, -1], smooth)
+                self.compare_smoothing(grayscale_image, axes[i, -1], smooth, threshold)
             plt.tight_layout()
             plt.show()
 
@@ -200,31 +187,26 @@ class ImageProcessingApp:
                     labels = kmeans.labels_
                     centers = kmeans.cluster_centers_
 
-                    # Вычисление среднеквадратичного отклонения от центроидов
                     score = np.mean((smoothed_image.reshape(-1, 1) - centers[labels]) ** 2)
 
-                    # Бинаризация изображения по лучшему порогу
                     binary_image = np.where(smoothed_image > np.mean(centers), 255, 0).astype(np.uint8)
 
-                    # Отображение сегментированного изображения
                     segmented_image = Image.fromarray(binary_image)
 
                     axes[i, j].imshow(segmented_image, cmap='gray')
-                    axes[i, j].set_title(f'(k={k}, smooth={smooth}), Отклонение: {score:.2f}')
+                    axes[i, j].set_title(f'(k={k}, Сглаживание={smooth}), Отклонение: {score:.2f}')
                     axes[i, j].axis('off')
 
-                    # Вызов метода для отображения гистограммы
                 self.compare_smoothing(grayscale_image, axes[i, -1], smooth_levels[i])
 
             plt.tight_layout()
             plt.show()
 
     def smooth_image(self, image, smooth_level):
-        # Применяем сглаживание к изображению
         smoothed_image = cv2.blur(image, (smooth_level * 2 + 1, smooth_level * 2 + 1))
         return smoothed_image
 
-    def compare_smoothing(self, image, ax, smooth):
+    def compare_smoothing(self, image, ax, smooth, threshold=None):
         histogram, _ = np.histogram(image.flatten(), bins=256, range=(0, 256))
 
         smoothed_hist = self.smooth_histogram(histogram, iterations=smooth)
@@ -232,9 +214,13 @@ class ImageProcessingApp:
 
         ax.plot(smoothed_hist)
         ax.plot(peaks, smoothed_hist[peaks], "x")
-        ax.set_title(f'После {smooth} сглаживаний')
+        ax.set_title(f'После {smooth} сглаживаний, пики {len(peaks)}')
         ax.set_xlabel('Интенсивность пикселя')
         ax.set_ylabel('Частота')
+
+        if threshold is not None:
+            ax.axvline(x=threshold, color='r', linestyle='--', label=f'Threshold: {threshold:.2f}')
+            ax.legend()
 
     def smooth_histogram(self, histogram, iterations):
         for _ in range(iterations):
@@ -246,29 +232,46 @@ class ImageProcessingApp:
         if self.image is not None:
             grayscale_image = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2GRAY)
 
-            # Получение выбранного метода
             method = self.method_var.get()
 
-            # Получение выбранного значения порога
             threshold_value = self.threshold_scale.get()
             k = int(self.threshold_scale_k.get())
-            # Применение выбранного метода порогования
+
             if method == "Среднее":
                 thresholded_image = cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
                                                           cv2.THRESH_BINARY, k, threshold_value)
             elif method == "Медиана":
-                thresholded_image = cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                                          cv2.THRESH_BINARY, k, threshold_value)
+                thresholded_image = adaptive_threshold_median(grayscale_image, k, threshold_value, 1)
             elif method == "(min+max)/2":
-                thresholded_image = cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
-                                                          cv2.THRESH_BINARY, k, threshold_value)
-                thresholded_image += cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                                           cv2.THRESH_BINARY_INV, k, threshold_value)
-                thresholded_image //= 2  # Применение формулы (min+max)/2
+                thresholded_image = adaptive_threshold_median(grayscale_image, k, threshold_value, 2)
 
-            # Отображение сегментированного изображения
             segmented_image = Image.fromarray(thresholded_image)
             self.display_image(segmented_image)
+
+
+def adaptive_threshold_median(image, block_size, threshold_value, method):
+    thresholded_image = np.zeros_like(image)
+
+    height, width = image.shape
+
+    for i in range(height):
+        for j in range(width):
+            start_i = max(0, i - block_size // 2)
+            end_i = min(height, i + block_size // 2)
+            start_j = max(0, j - block_size // 2)
+            end_j = min(width, j + block_size // 2)
+
+            neighborhood = image[start_i:end_i, start_j:end_j]
+            if method == 1:
+                median_value = np.median(neighborhood)
+            elif method == 2:
+                median_value = (np.min(neighborhood) + np.max(neighborhood)) // 2
+            if image[i, j] > median_value - threshold_value:
+                thresholded_image[i, j] = 255
+            else:
+                thresholded_image[i, j] = 0
+
+    return thresholded_image
 
 
 if __name__ == "__main__":
