@@ -45,9 +45,21 @@ class ImageProcessingApp:
         self.threshold_frame3 = tk.LabelFrame(self.root, text="ПУНКТ 1.")
         self.threshold_frame3.grid(row=2, column=0, padx=20, pady=20)
 
+        # Создаем метки и поля ввода для значений
+        tk.Label(self.threshold_frame3, text="Нижний порог:").grid(row=0, column=0)
+        tk.Label(self.threshold_frame3, text="Верхний порог:").grid(row=1, column=0)
+
+        self.lower_threshold_entry = tk.Entry(self.threshold_frame3)
+        self.lower_threshold_entry.insert(0, "100")  # Устанавливаем значение по умолчанию
+        self.lower_threshold_entry.grid(row=0, column=1)
+
+        self.upper_threshold_entry = tk.Entry(self.threshold_frame3)
+        self.upper_threshold_entry.insert(0, "200")  # Устанавливаем значение по умолчанию
+        self.upper_threshold_entry.grid(row=1, column=1)
+
         self.nearing = tk.Button(self.threshold_frame3, text="Алгоритм выделения краев",
                                  command=self.segment_by_edge_detection)
-        self.nearing.pack()
+        self.nearing.grid(row=2, columnspan=2)
 
 
     def create_threshold_interface2(self):
@@ -68,6 +80,8 @@ class ImageProcessingApp:
         self.edging.pack(pady=5)
         self.kmeans = tk.Button(self.threshold_frame2, text="К-means", command=self.k_means_segmentation)
         self.kmeans.pack(pady=5)
+        self.kmeans_check_optimal = tk.Button(self.threshold_frame2, text="Оптимальный k", command=self.k_means_optimal)
+        self.kmeans_check_optimal.pack(pady=5)
 
     def create_threshold_interface3(self):
         self.threshold_frame = tk.LabelFrame(self.root, text="ПУНКТ 3")
@@ -109,10 +123,13 @@ class ImageProcessingApp:
 
     # пункт 1
     def segment_by_edge_detection(self):
+        lower_threshold = int(self.lower_threshold_entry.get())
+        upper_threshold = int(self.upper_threshold_entry.get())
+
         grayscale_image = np.array(self.image.convert("L"))
 
-        edges = cv2.Canny(grayscale_image, 100, 200)
-#убрать хардкод
+        edges = cv2.Canny(grayscale_image, lower_threshold, upper_threshold)
+
         binary_image = np.where(edges > 0, 0, 255).astype(np.uint8)
 
         segmented_image = Image.fromarray(binary_image)
@@ -139,7 +156,7 @@ class ImageProcessingApp:
             percentile = self.threshold_scale2.get()
             threshold = np.percentile(grayscale_image, percentile)
 
-            max_iterations = 100
+            max_iterations = 10000000
             iteration = 0
             smooth_levels = [0, 1, 3, 50]
             fig, axes = plt.subplots(len(smooth_levels), 2, figsize=(10, 15))
@@ -154,7 +171,7 @@ class ImageProcessingApp:
 
                     new_threshold = (foreground_mean + background_mean) / 2
 
-                    if abs(new_threshold - threshold) < 0.1 or iteration >= max_iterations:
+                    if abs(new_threshold - threshold) < 0.001 or iteration >= max_iterations:
                         break
 
                     threshold = new_threshold
@@ -171,6 +188,23 @@ class ImageProcessingApp:
             plt.show()
 
     # Метод к-средних
+    def k_means_optimal(self):
+        if self.image is not None:
+            grayscale_image = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2GRAY)
+            distortions = []
+
+            k_values = range(1, 11)
+            for k in k_values:
+                kmeans = KMeans(n_clusters=k, random_state=0)
+                kmeans.fit(grayscale_image.reshape(-1, 1))
+                distortions.append(kmeans.inertia_)
+
+            plt.plot(k_values, distortions, 'bx-')
+            plt.xlabel('Количество кластеров (k)')
+            plt.ylabel('Искажение')
+            plt.title('Elbow Method для оптимального k')
+            plt.show()
+
 
     def k_means_segmentation(self):
         if self.image is not None:
@@ -232,21 +266,35 @@ class ImageProcessingApp:
         if self.image is not None:
             grayscale_image = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2GRAY)
 
-            method = self.method_var.get()
+            # Получение выбранных значений порога и k
+            threshold_values = [10, 40]
+            ks = [3, 25, 51]
 
-            threshold_value = self.threshold_scale.get()
-            k = int(self.threshold_scale_k.get())
+            # Создание холста для отображения
+            num_plots = len(threshold_values) * len(ks)
+            fig, axes = plt.subplots(len(threshold_values), len(ks), figsize=(15, 10))
 
-            if method == "Среднее":
-                thresholded_image = cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
-                                                          cv2.THRESH_BINARY, k, threshold_value)
-            elif method == "Медиана":
-                thresholded_image = adaptive_threshold_median(grayscale_image, k, threshold_value, 1)
-            elif method == "(min+max)/2":
-                thresholded_image = adaptive_threshold_median(grayscale_image, k, threshold_value, 2)
+            # Перебор всех комбинаций параметров и отображение результатов
+            for i, threshold_value in enumerate(threshold_values):
+                for j, k in enumerate(ks):
+                    if self.method_var.get() == "Среднее":
+                        thresholded_image = cv2.adaptiveThreshold(grayscale_image, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                                                                  cv2.THRESH_BINARY, k, threshold_value)
+                    elif self.method_var.get() == "Медиана":
+                        thresholded_image = adaptive_threshold_median(grayscale_image, k, threshold_value, 1)
+                    elif self.method_var.get() == "(min+max)/2":
+                        thresholded_image = adaptive_threshold_median(grayscale_image, k, threshold_value, 2)
 
-            segmented_image = Image.fromarray(thresholded_image)
-            self.display_image(segmented_image)
+                    axes[i, j].imshow(thresholded_image, cmap='gray')
+                    axes[i, j].set_title(f"k={k}, Порог={threshold_value}")
+
+            # Настройка общих параметров для всех графиков
+            for ax in axes.flat:
+                ax.axis('off')
+
+            # Отображение результатов
+            plt.tight_layout()
+            plt.show()
 
 
 def adaptive_threshold_median(image, block_size, threshold_value, method):
